@@ -26,6 +26,10 @@ rec {
     (type == "symlink" && lib.hasPrefix "result" baseName)
   );
 
+  # Filters a source tree removing version control files and directories using cleanSourceFilter
+  #
+  # Example:
+  #          cleanSource ./.
   cleanSource = builtins.filterSource cleanSourceFilter;
 
   # Filter sources by a list of regular expressions.
