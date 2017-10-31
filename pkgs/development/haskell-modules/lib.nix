@@ -5,31 +5,122 @@
 rec {
   makePackageSet = import ./make-package-set.nix;
 
+  /* The function overrideCabal lets you alter the arguments to the
+     mkDerivation function.
+
+     Example:
+
+     First, note how the aeson package is constructed in hackage-packages.nix:
+
+         "aeson" = callPackage ({ mkDerivation, attoparsec, <snip>
+                                }:
+                                  mkDerivation {
+                                    pname = "aeson";
+                                    <snip>
+                                    homepage = "https://github.com/bos/aeson";
+                                  })
+
+     The mkDerivation function of haskellPackages will take care of putting
+     the homepage in the right place, in meta.
+
+         > haskellPackages.aeson.meta.homepage
+         "https://github.com/bos/aeson"
+
+         > x = haskell.lib.overrideCabal haskellPackages.aeson (old: { homepage = old.homepage + "#readme"; })
+         > x.meta.homepage
+         "https://github.com/bos/aeson#readme"
+
+   */
   overrideCabal = drv: f: (drv.override (args: args // {
     mkDerivation = drv: (args.mkDerivation drv).override f;
   })) // {
     overrideScope = scope: overrideCabal (drv.overrideScope scope) f;
   };
 
+  /* doCoverage modifies a haskell package to enable the generation
+     and installation of a coverage report.
+
+     See https://wiki.haskell.org/Haskell_program_coverage
+   */
   doCoverage = drv: overrideCabal drv (drv: { doCoverage = true; });
+
+  /* dontCoverage modifies a haskell package to disable the generation
+     and installation of a coverage report.
+   */
   dontCoverage = drv: overrideCabal drv (drv: { doCoverage = false; });
 
+  /* doHaddock modifies a haskell package to enable the generation and
+     installation of API documentation from code comments using the
+     haddock tool.
+   */
   doHaddock = drv: overrideCabal drv (drv: { doHaddock = true; });
+
+  /* dontHaddock modifies a haskell package to disable the generation and
+     installation of API documentation from code comments using the
+     haddock tool.
+   */
   dontHaddock = drv: overrideCabal drv (drv: { doHaddock = false; });
 
+  /* doJailbreak enables the removal of version bounds from the cabal
+     file. You may want to avoid this function.
+
+     This is useful when a package reports that it can not be built
+     due to version mismatches. In some cases, removing the version
+     bounds entirely is an easy way to make a package build, but at
+     the risk of breaking software in non-obvious ways now or in the
+     future.
+
+     Instead of jailbreaking, you can patch the cabal file.
+   */
   doJailbreak = drv: overrideCabal drv (drv: { jailbreak = true; });
+
+  /* dontJailbreak restores the use of the version bounds the check
+     the use of dependencies in the package description.
+   */
   dontJailbreak = drv: overrideCabal drv (drv: { jailbreak = false; });
 
+  /* doCheck enables dependency checking, compilation and execution
+     of test suites listed in the package description file.
+   */
   doCheck = drv: overrideCabal drv (drv: { doCheck = true; });
+  /* dontCheck disables dependency checking, compilation and execution
+     of test suites listed in the package description file.
+   */
   dontCheck = drv: overrideCabal drv (drv: { doCheck = false; });
 
+  /* doBenchmark enables dependency checking, compilation and execution
+     for benchmarks listed in the package description file.
+   */
   doBenchmark = drv: overrideCabal drv (drv: { doBenchmark = true; });
+  /* dontBenchmark disables dependency checking, compilation and execution
+     for benchmarks listed in the package description file.
+   */
   dontBenchmark = drv: overrideCabal drv (drv: { doBenchmark = false; });
 
+  /* doDistribute enables the distribution of binaries for the package
+     via hydra.
+   */
   doDistribute = drv: overrideCabal drv (drv: { hydraPlatforms = drv.platforms or ["i686-linux" "x86_64-linux" "x86_64-darwin"]; });
+  /* dontDistribute disables the distribution of binaries for the package
+     via hydra.
+   */
   dontDistribute = drv: overrideCabal drv (drv: { hydraPlatforms = []; });
 
+  /* appendConfigureFlag adds a single argument that will be passed to the
+     cabal configure command, after the arguments that have been defined
+     in the initial declaration or previous overrides.
+
+     Example:
+
+         > haskell.lib.appendConfigureFlag haskellPackages.servant "--profiling-detail=all-functions"
+   */
   appendConfigureFlag = drv: x: overrideCabal drv (drv: { configureFlags = (drv.configureFlags or []) ++ [x]; });
+
+  /* removeConfigureFlag drv x is a Haskell package like drv, but with
+     all cabal configure arguments that are equal to x removed.
+
+         > haskell.lib.removeConfigureFlag haskellPackages.servant "--verbose"
+   */
   removeConfigureFlag = drv: x: overrideCabal drv (drv: { configureFlags = lib.remove x (drv.configureFlags or []); });
 
   addBuildTool = drv: x: addBuildTools drv [x];
